@@ -19,7 +19,7 @@ import requests
 sys.setrecursionlimit(10000)
 
 API_TOKEN = cfg.API_TOKEN
-BOT_SUPERADMIN = 176855388
+BOT_SUPERADMIN = cfg.BOT_SUPERADMIN
 bot = telebot.TeleBot(API_TOKEN,threaded = False)
 def Terminate():
 	os.killpg(os.getpid(), signal.SIGTERM)

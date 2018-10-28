@@ -16,14 +16,15 @@ import time, datetime
 import zipfile
 import requests
 
-sys.setrecursionlimit(10000)
-
 API_TOKEN = cfg.API_TOKEN
 BOT_SUPERADMIN = cfg.BOT_SUPERADMIN
+
 bot = telebot.TeleBot(API_TOKEN,threaded = False)
+
 def Terminate():
+	''' Kills all child processes when bot stops '''
 	os.killpg(os.getpid(), signal.SIGTERM)
-atexit.register(Terminate)
+
 def sec2time(sec, n_msec=0):
     ''' Convert seconds to 'D days, HH:MM:SS.FFF' '''
     if hasattr(sec,'__len__'):
@@ -38,15 +39,16 @@ def sec2time(sec, n_msec=0):
     if d == 0:
         return pattern % (h, m, s)
     return ('%d days, ' + pattern) % (d, h, m, s)
-#LISTING BOTS
+
 def getBots():
-	botl = {}
-	botfolders = list(filter(lambda x: os.path.isdir(x) and x.startswith('bot_'), os.listdir('.')))
-	for i in botfolders:
+
+	bot_list = {}
+	bot_folders = list(filter(lambda x: os.path.isdir(x) and x.startswith('bot_'), os.listdir('.')))
+	for i in bot_folders:
 		try:
 			botinf = json.loads(open(i + "/BOTINF").read())
 			if 'name' in botinf and 'description' in botinf and 'lastupdate' in botinf and 'name' in botinf and 'app' in botinf and 'run_env' in botinf and 'userid' in botinf and 'creator' in botinf:
-				botl[i] = botinf
+				bot_list[i] = botinf
 				print('Bot ' + i + ' loaded')
 			else:
 				print('Error occured while adding ' + i + ': BOTINF file has no one or more nessesary parameters')
@@ -54,7 +56,8 @@ def getBots():
 			print('Error occured while adding ' + i + ': ' + str(e))
 			continue
 
-	return botl
+	return bot_list
+
 running = {}
 runtime = {}
 
@@ -62,6 +65,11 @@ bots = getBots()
 
 @bot.message_handler(content_types = ['document'])
 def deployBot(msg):
+	'''
+	# When superadmin sends .zip file to bot
+	# unpacking it and cheking BOTINF file for errors
+	# then installing it
+	'''
 	global bots
 	print(msg.document.file_id)
 	if msg.document.file_name.startswith('bot_') and msg.document.mime_type == 'application/zip':
@@ -84,21 +92,31 @@ def deployBot(msg):
 			bots = getBots()
 		else:
 			bot.reply_to('You can\'t deploy bots. Please, write to @GrZd')
+
 @bot.message_handler(commands = ['reload'])
 def reload(msg):
+	''' Reloading the list of bots '''
 	global bots
 	bots = getBots()
 	bot.reply_to(msg,'BotList was reloaded')
+
 @bot.message_handler(commands = ['start'])
 def listof(msg):
+	''' Sends greetings message to user when /start '''
 	keyboard = types.InlineKeyboardMarkup()
 	keyboard.add(types.InlineKeyboardButton(text = 'Next step', callback_data='$list'))
 	bot.send_message(msg.from_user.id,strings.botinfocard,reply_markup = keyboard)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
+	''' Global handler of inline buttons '''
 	if call.message:
 		if call.data.startswith('$ob_'):
+			''' 
+			# ob means observe bot.
+			# When button is pressed, sends detailed info about bot
+			# and controls for it
+			'''
 			bot.answer_callback_query(call.id,'Processing...',show_alert = False)
 			botname = call.data.replace('$ob_','')
 			isrunning = (running[botname].poll() == None) if botname in running else False
@@ -118,7 +136,14 @@ def callback_inline(call):
 					del runtime[botname]
 				else:
 					bot.edit_message_text(chat_id = call.from_user.id,message_id = call.message.message_id, text = strings.botcard.format(bots[botname]['name'],bots[botname]['description'],bots[botname]['lastupdate'],bots[botname]['app'],bots[botname]['creator']) + (('\n' + strings.running.format(str(running[botname].pid),sec2time(time.time() - runtime[botname]) if botname in running else '0')) if botname in running else ''),parse_mode = 'html',reply_markup = keyboard)
+		
 		elif call.data.startswith('$rb_'):
+			'''
+			# rb means run bot.
+			# When button is presseed
+			# creating subprocess with bot 
+			# and returning to user PID of this subprocess
+			'''
 			bot.answer_callback_query(call.id,'Processing...',show_alert = False)
 			botname = call.data.replace('$rb_','')
 			botwd = os.getcwd() + '/' + botname
@@ -130,6 +155,13 @@ def callback_inline(call):
 			keyboard.row(types.InlineKeyboardButton(text=strings.back_to, callback_data='$ob_' + botname),types.InlineKeyboardButton(text=strings.goback, callback_data='$list'))
 			bot.edit_message_text(chat_id = call.from_user.id,message_id = call.message.message_id, text = strings.started.format(bots[botname]['name'],str(process.pid)),reply_markup = keyboard,parse_mode = 'html')
 		elif call.data.startswith('$kb_'):
+			'''
+			# kb means kill bot.
+			# When button is pressed
+			# send SIGKILL to bot\'s subprocess,
+			# removing it from running list and 
+			# show runtime to user
+			'''
 			bot.answer_callback_query(call.id,'Processing...',show_alert = False)
 			botname = call.data.replace('$kb_','')
 			try:
@@ -193,6 +225,7 @@ def callback_inline(call):
 			filename = call.data.replace('$of_','')	
 			bot.send_document(call.from_user.id,open(filename,'rb'))
 
+atexit.register(Terminate)
 def telegram_polling():
     try:
         bot.polling(none_stop=True, timeout=60) #constantly get messages from Telegram

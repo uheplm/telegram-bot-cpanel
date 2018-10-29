@@ -16,8 +16,8 @@ import time, datetime
 import zipfile
 import requests
 
-API_TOKEN = cfg.API_TOKEN
-BOT_SUPERADMIN = cfg.BOT_SUPERADMIN
+API_TOKEN = cfg.API_TOKEN # api token from @BotFather
+BOT_SUPERADMIN = cfg.BOT_SUPERADMIN # id of owner of bot
 
 bot = telebot.TeleBot(API_TOKEN,threaded = False)
 
@@ -41,7 +41,11 @@ def sec2time(sec, n_msec=0):
     return ('%d days, ' + pattern) % (d, h, m, s)
 
 def getBots():
-
+	''' 
+	# Looking for folders with name starts with \"bot_\"
+	# and also checks BOTFILE for errors.
+	# For generating BOTFILE use BOTFILE_tool.py
+	'''
 	bot_list = {}
 	bot_folders = list(filter(lambda x: os.path.isdir(x) and x.startswith('bot_'), os.listdir('.')))
 	for i in bot_folders:
@@ -176,6 +180,9 @@ def callback_inline(call):
 			if botname in runtime:
 				del runtime[botname]
 		elif call.data.startswith('$list'):
+			'''
+			# Sends to user a list of bots
+			'''
 			bot.answer_callback_query(call.id,'Processing...',show_alert = False)
 			keyboard = types.InlineKeyboardMarkup()
 			count = 0
@@ -187,6 +194,9 @@ def callback_inline(call):
 				keyboard.add(types.InlineKeyboardButton(text=strings.add_bot, callback_data='$addb'))
 			bot.edit_message_text(chat_id = call.from_user.id,message_id = call.message.message_id, text = strings.botlist.format(len(running),count),parse_mode = 'html',reply_markup = keyboard)
 		elif call.data.startswith('$rlb_'):
+			'''
+			# rlb means relaunch bot
+			'''
 			bot.answer_callback_query(call.id,'Processing...',show_alert = False)
 			botname = call.data.replace('$rlb_','')
 			if botname in running:
@@ -206,12 +216,19 @@ def callback_inline(call):
 			keyboard.row(types.InlineKeyboardButton(text=strings.back_to, callback_data='$ob_' + botname),types.InlineKeyboardButton(text=strings.goback, callback_data='$list'))
 			bot.edit_message_text(chat_id = call.from_user.id,message_id = call.message.message_id, text = strings.restarted.format(bots[botname]['name'],str(process.pid)),reply_markup = keyboard,parse_mode = 'html')
 		elif call.data.startswith('$addb'):
+			''' 
+			#addb means addbot
+			'''
 			keyboard = types.InlineKeyboardMarkup()
 			keyboard.add(types.InlineKeyboardButton(text = 'Write to GrZd',url = 'tg://resolve?domain=Gr_Zd'))
 			keyboard.add(types.InlineKeyboardButton(text = strings.goback, callback_data = '$list'))
 			bot.send_document(call.from_user.id,'BQADAgADMwIAAvM98EsvtVRol7AeQgI')
 			bot.edit_message_text(chat_id = call.from_user.id,message_id = call.message.message_id, text = strings.add_help, reply_markup = keyboard, parse_mode = 'html')
 		elif call.data.startswith('$gf_'):
+			'''
+			# gf means get files
+			# sends to a user list of files in folder of bot
+			'''
 			bot.answer_callback_query(call.id,'Processing...',show_alert = False)
 			botname = call.data.replace('$gf_','')
 			keyboard = types.InlineKeyboardMarkup()
@@ -221,14 +238,21 @@ def callback_inline(call):
 			keyboard.add(types.InlineKeyboardButton(text = strings.back_to, callback_data = "$ob_" + botname))
 			bot.edit_message_text(chat_id = call.from_user.id,message_id = call.message.message_id, text = strings.filestext.format(), reply_markup = keyboard, parse_mode = 'html')
 		elif call.data.startswith('$of_'):
+			'''
+			# of means open file
+			# sends to user a file, selected by gf
+			'''
 			bot.answer_callback_query(call.id,'Processing...',show_alert = False)
 			filename = call.data.replace('$of_','')	
 			bot.send_document(call.from_user.id,open(filename,'rb'))
 
 atexit.register(Terminate)
 def telegram_polling():
+	''' 
+	# Try to relaunch bot after crash
+	'''
     try:
-        bot.polling(none_stop=True, timeout=60) #constantly get messages from Telegram
+        bot.polling(none_stop=True, timeout=60)
     except Exception as e:
         bot.stop_polling()
         time.sleep(10)
